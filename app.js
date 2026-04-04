@@ -1,5 +1,5 @@
 // ── State ─────────────────────────────────────────────────
-const BACKEND = "https://ml-miner-backend.vercel.app";
+const BACKEND = "";
 let products = [];
 let fileRows = [], fileHeaders = [];
 
@@ -276,7 +276,7 @@ function showUploadMsg(type, text) {
 
 // ── ML Analysis ───────────────────────────────────────────
 async function fetchML(query) {
-  const url = `${BACKEND}/search?q=${encodeURIComponent(query)}&limit=20`;
+  const url = `/api/search?q=${encodeURIComponent(query)}&limit=20`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Backend ${res.status}`);
   const data = await res.json();
