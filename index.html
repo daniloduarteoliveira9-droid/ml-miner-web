@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="theme-color" content="#080c10"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="ML Miner"/>
+  <title>ML Miner — Minerador de Produtos</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icon-192.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+  <header class="header">
+    <div class="logo-icon">🔍</div>
+    <div>
+      <div class="header-title">ML Miner</div>
+      <div class="header-sub">Minerador de Produtos · Mercado Livre</div>
+    </div>
+    <div class="header-badge" id="statusBadge">● ONLINE</div>
+  </header>
+
+  <main class="main">
+    <div class="grid-2">
+      <!-- LEFT PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-dot"></div>
+          <span class="panel-title">Catálogo <span class="counter-chip" id="productCount" style="display:none">0</span></span>
+        </div>
+        <div class="panel-body">
+
+          <!-- TABS -->
+          <div class="tab-row">
+            <button class="tab active" onclick="switchTab('manual')">Manual</button>
+            <button class="tab" onclick="switchTab('csv')">CSV</button>
+            <button class="tab" onclick="switchTab('arquivo')">📎 Arquivo</button>
+          </div>
+
+          <!-- MANUAL TAB -->
+          <div id="tab-manual">
+            <div class="input-row">
+              <label class="input-label">Nome do produto</label>
+              <input class="input-field" id="prodName" placeholder="ex: Fone Bluetooth JBL" onkeydown="if(event.key==='Enter')addProduct()"/>
+            </div>
+            <div class="input-row">
+              <label class="input-label">Seu custo (R$)</label>
+              <input class="input-field" id="prodCost" type="number" placeholder="ex: 85.00" min="0" step="0.01" onkeydown="if(event.key==='Enter')addProduct()"/>
+            </div>
+            <button class="btn-add" onclick="addProduct()">+ Adicionar Produto</button>
+          </div>
+
+          <!-- CSV TAB -->
+          <div id="tab-csv" style="display:none">
+            <div class="csv-area">
+              <textarea class="csv-textarea" id="csvText" rows="6" placeholder="Nome do produto,custo&#10;Tênis Nike,120&#10;Mochila,45"></textarea>
+            </div>
+            <button class="btn-add" onclick="importCSV()">Importar CSV</button>
+            <div class="csv-hint">formato: nome,custo — uma linha por produto</div>
+          </div>
+
+          <!-- ARQUIVO TAB -->
+          <div id="tab-arquivo" style="display:none">
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
+              <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.txt,.pdf" style="display:none" onchange="handleFileSelect(event)"/>
+              <div class="upload-icon" id="uploadIcon">📂</div>
+              <div class="upload-title" id="uploadTitle">Arraste ou clique para anexar</div>
+              <div class="upload-sub">seu catálogo de produtos</div>
+              <div class="upload-formats">
+                <span class="format-tag format-pdf">PDF</span>
+                <span class="format-tag format-csv">CSV</span>
+                <span class="format-tag format-xlsx">XLSX</span>
+                <span class="format-tag format-txt">TXT</span>
+              </div>
+            </div>
+            <div id="uploadMsg" style="display:none"></div>
+            <div id="colMap" style="display:none">
+              <div class="col-map">
+                <div class="col-map-title">Mapear Colunas</div>
+                <div class="col-map-row">
+                  <div>
+                    <div class="col-label">NOME DO PRODUTO</div>
+                    <select class="col-select" id="colName"></select>
+                  </div>
+                  <div>
+                    <div class="col-label">SEU CUSTO (R$)</div>
+                    <select class="col-select" id="colCost"></select>
+                  </div>
+                </div>
+                <button class="btn-import" onclick="importFromFile()">↓ Importar Produtos</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PRODUCT LIST -->
+          <div class="product-list" id="productList" style="display:none"></div>
+
+          <hr class="divider"/>
+
+          <!-- MARGIN SLIDER -->
+          <div class="config-row">
+            <div class="config-label">
+              <span>MARGEM MÍNIMA</span>
+              <span class="config-value" id="marginVal">20%</span>
+            </div>
+            <input type="range" class="slider" id="marginSlider" min="5" max="50" value="20" oninput="document.getElementById('marginVal').textContent=this.value+'%'"/>
+          </div>
+
+          <button class="btn-analyze" id="analyzeBtn" onclick="analyze()">
+            ⚡ Analisar no Mercado Livre
+          </button>
+          <div id="analyzeError" style="display:none" class="upload-error"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="panel" id="resultsPanel">
+        <div class="panel-header">
+          <div class="panel-dot"></div>
+          <span class="panel-title">Resultados</span>
+          <div class="results-stats" id="resultsStats" style="display:none">
+            <div class="stat-badge"><div class="stat-dot dot-green"></div><span id="buyCount">0 comprar</span></div>
+            <div class="stat-badge"><div class="stat-dot dot-yellow"></div><span id="evalCount">0 avaliar</span></div>
+            <div class="stat-badge"><div class="stat-dot dot-red"></div><span id="skipCount">0 evitar</span></div>
+          </div>
+        </div>
+
+        <div id="progressBar" style="display:none" class="progress-bar">
+          <div class="progress-info">
+            <span class="progress-label">ANALISANDO</span>
+            <span class="progress-count" id="progressCount">0/0</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+          <div class="progress-status" id="progressStatus">Aguardando...</div>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-title">Pronto para minerar</div>
+          <div class="empty-text">Adicione produtos com seu custo de compra<br/>e clique em Analisar.</div>
+        </div>
+
+        <div id="resultsTable" style="display:none">
+          <div class="table-head">
+            <div class="th">Produto</div>
+            <div class="th">Preço ML</div>
+            <div class="th">Margem</div>
+            <div class="th">Demanda</div>
+            <div class="th">Comp.</div>
+            <div class="th">Score</div>
+            <div class="th">Decisão</div>
+          </div>
+          <div id="resultRows"></div>
+          <div id="summaryBar" class="summary-bar" style="display:none">
+            <div class="summary-item"><div class="summary-value" id="sumBuy" style="color:#10b981">0</div><div class="summary-label">Oportunidades</div></div>
+            <div class="summary-item"><div class="summary-value" id="sumMargin" style="color:#fbbf24">0%</div><div class="summary-label">Margem Média</div></div>
+            <div class="summary-item"><div class="summary-value" id="sumTotal" style="color:#94a3b8">0</div><div class="summary-label">Analisados</div></div>
+            <div class="summary-item"><div class="summary-value" id="sumTarget" style="color:#fbbf24">20%</div><div class="summary-label">Meta Margem</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
