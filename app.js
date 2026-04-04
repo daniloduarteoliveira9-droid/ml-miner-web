@@ -173,35 +173,57 @@ function loadScript(src) {
 }
 
 function extractFromText(text) {
-  const lines = text.split(/\n|;/).map(l => l.trim()).filter(l => l.length > 3);
-  const results = []; const seen = new Set();
-  const priceRx = /R?\$?\s*(\d{1,6}[.,]\d{2})\b/g;
+  const results = [];
+  const seen = new Set();
+
+  // Estratégia 1: padrão "Nome do Produto R$ 99,90" ou "Nome ... 99,90"
+  const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 3 && l.length < 200);
+
+  const priceRx = /R?\$?\s*(\d{1,5}[.,]\d{2})\b/;
+  const loosePrice = /\b(\d{2,4})[,.]?(\d{2})?\s*$/;
+
   for (const line of lines) {
-    if (/^\d+$/.test(line) || line.length < 4) continue;
-    const prices = [];
-    let m; const rx = new RegExp(priceRx.source, "g");
-    while ((m = rx.exec(line)) !== null) {
-      const v = parseFloat(m[1].replace(",", "."));
-      if (v > 0.5 && v < 99999) prices.push(v);
-    }
-    if (prices.length > 0) {
-      const name = line.replace(/R?\$?\s*\d{1,6}[.,]\d{2}/g, "").replace(/\s{2,}/g, " ").replace(/^[\s\-–|:,]+|[\s\-–|:,]+$/g, "").trim();
-      if (name.length >= 3 && !seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase()); results.push({ name, cost: Math.min(...prices) });
-      }
+    // Ignora linhas que são claramente lixo
+    if (/PCS\/CX|Suporte Técnico|imagens apresentadas|esclarecimentos|funcionalidades|Voltar ao topo|por por por/i.test(line)) continue;
+    if (/^\d+$/.test(line)) continue;
+    if (line.split(" ").length < 2) continue;
+
+    let cost = null;
+    let name = line;
+
+    // Tenta achar preço no formato R$ XX,XX
+    const m = line.match(priceRx);
+    if (m) {
+      cost = parseFloat(m[1].replace(",", "."));
+      name = line.replace(priceRx, "").trim();
     } else {
-      const parts = line.split(/\s+/);
-      const last = parts[parts.length - 1];
-      const v = parseFloat(last.replace(",", "."));
-      if (!isNaN(v) && v > 1 && v < 99999 && parts.length > 1) {
-        const name = parts.slice(0, -1).join(" ").trim();
-        if (name.length >= 3 && !seen.has(name.toLowerCase())) {
-          seen.add(name.toLowerCase()); results.push({ name, cost: v });
-        }
+      // Tenta preço no final da linha
+      const m2 = line.match(/\b(\d{1,4})[,.](\d{2})\s*$/);
+      if (m2) {
+        cost = parseFloat(m2[1] + "." + m2[2]);
+        name = line.replace(/\b(\d{1,4})[,.](\d{2})\s*$/, "").trim();
       }
     }
+
+    if (!cost || cost <= 0 || cost > 50000) continue;
+
+    // Limpa o nome
+    name = name
+      .replace(/Cód[:\s.]+[\w\-]+/gi, "")
+      .replace(/\(NÃO\s+\w+\)/gi, "")
+      .replace(/^\W+|\W+$/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (name.length < 4 || name.length > 100) continue;
+    if (/^\d+$/.test(name)) continue;
+    if (seen.has(name.toLowerCase())) continue;
+
+    seen.add(name.toLowerCase());
+    results.push({ name, cost });
   }
-  return results;
+
+  return results.slice(0, 50); // máximo 50 produtos
 }
 
 function autoImportOrMap(headers, rows, fileName) {
