@@ -1,14 +1,14 @@
 const https = require("https");
 
-function get(url) {
+function get(url, token) {
   return new Promise((resolve, reject) => {
-    const options = {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json",
-      },
+    const headers = {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "application/json",
     };
-    https.get(url, options, (res) => {
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    
+    https.get(url, { headers }, (res) => {
       let d = "";
       res.on("data", c => d += c);
       res.on("end", () => {
@@ -17,6 +17,56 @@ function get(url) {
       });
     }).on("error", reject);
   });
+}
+
+function post(urlStr, bodyStr) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const options = {
+      hostname: u.hostname,
+      path: u.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(bodyStr),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let d = "";
+      res.on("data", c => d += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(d) }); }
+        catch { resolve({ status: res.statusCode, body: {} }); }
+      });
+    });
+    req.on("error", reject);
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function getValidToken() {
+  // Try refresh token first
+  const refresh = process.env.ML_REFRESH_TOKEN;
+  const appId = process.env.ML_APP_ID;
+  const secret = process.env.ML_SECRET;
+
+  if (refresh && appId && secret) {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: appId,
+      client_secret: secret,
+      refresh_token: refresh,
+    }).toString();
+
+    const res = await post("https://api.mercadolibre.com/oauth/token", body);
+    if (res.status === 200 && res.body.access_token) {
+      return res.body.access_token;
+    }
+  }
+
+  // Fallback to access token
+  return process.env.ML_ACCESS_TOKEN || null;
 }
 
 function cleanQuery(q) {
@@ -39,11 +89,16 @@ module.exports = async (req, res) => {
   if (!q) return res.status(400).json({ error: "q obrigatorio" });
 
   try {
-    const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(q)}&limit=20&sort=relevance`;
-    const result = await get(url);
+    const token = await getValidToken();
+    const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(q)}&limit=20`;
+    const result = await get(url, token);
 
     if (result.status !== 200) {
-      return res.status(200).json({ query: q, total_listings: 0, items: [], error_detail: result.body });
+      return res.status(500).json({ 
+        error: `ML retornou ${result.status}`,
+        detail: result.body,
+        token_used: token ? "sim" : "nao"
+      });
     }
 
     const items = (result.body.results || []).filter(i => i.price > 0);
