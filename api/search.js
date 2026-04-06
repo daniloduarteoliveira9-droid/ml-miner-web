@@ -1,12 +1,12 @@
 const https = require("https");
 
-função obter(url) {
-  retornar nova Promise((resolver, rejeitar) => {
+function get(url) {
+  return new Promise((resolve, reject) => {
     https.get(url, { headers: { "User-Agent": "MLMiner/1.0" } }, (res) => {
-      seja d = "";
+      let d = "";
       res.on("data", c => d += c);
       res.on("end", () => {
-        tente { resolver(JSON.parse(d)); }
+        try { resolve(JSON.parse(d)); }
         catch { resolve({}); }
       });
     }).on("error", reject);
@@ -18,28 +18,28 @@ module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  seja q = req.query.q || "";
+  let q = req.query.q || "";
   q = q.replace(/Cód[:\s.]+[\w\-]+/gi, "").replace(/\([^)]{0,30}\)/g, "").trim().slice(0, 80);
-  if (!q) return res.status(400).json({ erro: "q obrigatório" });
+  if (!q) return res.status(400).json({ error: "q obrigatório" });
 
-  tentar {
+  try {
     const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(q)}&limit=20`;
     const data = await get(url);
     const items = (data.results || []).filter(i => i.price > 0);
 
-    retornar res.status(200).json({
-      consulta: q,
+    return res.status(200).json({
+      query: q,
       total_listings: data.paging?.total || 0,
-      itens: itens.map(i => ({
+      items: items.map(i => ({
         id: i.id,
-        título: i.título,
-        preço: i.preço,
-        condição: i.condição,
-        quantidade_vendida: i.quantidade_vendida || 0,
-        frete_grátis: i.frete?.frete_grátis || falso,
+        title: i.title,
+        price: i.price,
+        condition: i.condition,
+        sold_quantity: i.sold_quantity || 0,
+        free_shipping: i.shipping?.free_shipping || false,
       })),
     });
   } catch (e) {
-    retornar res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 };
